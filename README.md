@@ -41,6 +41,27 @@ Simply run `make` in the project folder:
 make
 ```
 
+If using the Nix flake, you will first need to [install Nix](https://nixos.org/download/) and enable Nix flakes.
+
+If not on NixOS, add this to `~/.config/nix/nix.conf`:
+
+```nix
+experimental-features = nix-command flakes
+```
+
+And then run `nix build .` in the project folder.
+
+If on NixOS, add this to your configuration:
+
+```nix
+nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+];
+```
+
+And rebuild, then run `nix build .` in the project folder.
+
 This will compile the program using the provided `Makefile`.  
 **Do not run as root** – the program writes to `~/.local/share/meowdo/`.
 
