@@ -41,6 +41,12 @@ Simply run `make` in the project folder:
 make
 ```
 
+If using the Nix flake, run:
+
+```bash
+nix build .
+```
+
 This will compile the program using the provided `Makefile`.  
 **Do not run as root** – the program writes to `~/.meowdo/`.
 
