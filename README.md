@@ -100,7 +100,7 @@ This will compile the program using the provided `Makefile`.
 ### Line format:
 
 ```
-<P|-|<x| >|<tag>|<text>|<created_ts>|<done_ts>
+<P|->|<x| >|<tag>|<text>|<created_ts>|<done_ts>
 ```
 
 Example:
