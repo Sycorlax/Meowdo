@@ -1,6 +1,5 @@
 # meowdo – a cat todo list for your terminal
 
-[![CI](https://github.com/Sycorlax/Meowdo/actions/workflows/build.yaml/badge.svg)](https://github.com/Sycorlax/Meowdo/actions/workflows/build.yaml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 meowdo is a cute, keyboard-driven todo list with a cat sidekick.  
@@ -126,8 +125,10 @@ It lives in your terminal, supports tags, search, pinning, and remembers everyth
 ## Contributing
 
 Pull requests are welcome! Please ensure:
-    Code compiles without warnings (-Wall -Wextra)
-    The GitHub Actions build passes
+
+Code compiles without warnings (-Wall -Wextra)
+ 
+The GitHub Actions build passes
 
 #  License
 
