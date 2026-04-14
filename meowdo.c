@@ -60,7 +60,7 @@ enum {
 };
 
 /* ── UTF-8 capability flag (set at startup) ── */
-static int g_utf8 = 0;
+static bool g_utf8 = 0;
 
 /* ── bongo art: braille (UTF-8) ── */
 static const char *BONGO_UTF8[BC_H] = {
@@ -143,7 +143,7 @@ static const char *bongo_mood(int p) {
 }
 
 /* ── UTF-8 detection: check LC_ALL / LC_CTYPE / LANG for UTF-8 ── */
-static int detect_utf8(void) {
+static bool detect_utf8(void) {
     const char *vars[] = { "LC_ALL", "LC_CTYPE", "LANG", NULL };
     for (int i = 0; vars[i]; i++) {
         const char *v = getenv(vars[i]);
@@ -152,9 +152,9 @@ static int detect_utf8(void) {
         char buf[64]; int j;
         for (j=0; v[j] && j<63; j++) buf[j]=(char)tolower((unsigned char)v[j]);
         buf[j]='\0';
-        if (strstr(buf,"utf")) return 1;
+        if (strstr(buf,"utf")) return true;
     }
-    return 0;
+    return false;
 }
 
 
