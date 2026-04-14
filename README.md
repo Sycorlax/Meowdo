@@ -1,6 +1,3 @@
-Here's the updated README with both badges:
-
-```markdown
 # meowdo – a cat todo list for your terminal
 
 [![CI](https://github.com/Sycorlax/Meowdo/actions/workflows/build.yml/badge.svg)](https://github.com/Sycorlax/Meowdo/actions/workflows/build.yml)
