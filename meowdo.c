@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <time.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 /* ------ constants ------ */
 #define MAX_TODOS  1024
@@ -95,7 +96,7 @@ static const char **BONGO = NULL;
 
 /* ------ data ------ */
 typedef struct {
-    int    done, pinned;
+    bool   done, pinned;
     char   tag[MAX_TAG];
     char   text[MAX_LINE];
     time_t created_at;
@@ -221,7 +222,7 @@ static void todos_load(void) {
         if (len>0&&line[len-1]=='\n') line[--len]='\0';
         if (len<5) continue;
         Todo *t=&todos[todo_count];
-        t->pinned=0;t->done=0;t->created_at=0;t->done_at=0;
+        t->pinned=false;t->done=false;t->created_at=0;t->done_at=0;
         t->tag[0]='\0';t->text[0]='\0';
         t->pinned=(line[0]=='P');
         t->done  =(line[2]=='x');
@@ -641,7 +642,8 @@ int main(void){
     WINDOW *sbar=newwin(1,  cols, rows-1, 0);
     if(!top||!left||!rite||!sbar){endwin();puts("failed to create windows");return 1;}
 
-    int list_top=0, running=1;
+    int list_top=0;
+    bool running=true;
 
     while(running){
         int nr,nc; getmaxyx(stdscr,nr,nc);
@@ -683,7 +685,7 @@ int main(void){
         smsg[0]='\0';
 
         switch(key){
-        case 'q': running=0; break;
+        case 'q': running=false; break;
 
         case KEY_UP:   case 'k': if(sel>0)           sel--; break;
         case KEY_DOWN: case 'j': if(sel<vis_count-1) sel++; break;
@@ -696,7 +698,7 @@ int main(void){
             char buf[MAX_LINE]="";
             if(popup("New task","what needs doing?",buf,(int)sizeof buf)&&todo_count<MAX_TODOS){
                 Todo *t=&todos[todo_count];
-                t->done=0;t->pinned=0;t->created_at=time(NULL);t->done_at=0;
+                t->done=false;t->pinned=false;t->created_at=time(NULL);t->done_at=0;
                 snprintf(t->tag,  MAX_TAG,  "%s", filter_tag[0]?filter_tag:"none");
                 snprintf(t->text, MAX_LINE, "%s", buf);
                 todo_count++; todos_save(); rebuild_vis(); sel=vis_count-1;
@@ -722,8 +724,8 @@ int main(void){
                 Todo *t=&todos[vis[sel]];
                 t->done=!t->done; t->done_at=t->done?time(NULL):0;
                 todos_save(); rebuild_vis();
-                int all_done=1;
-                for(int i=0;i<todo_count;i++) if(!todos[i].done){all_done=0;break;}
+                bool all_done=true;
+                for(int i=0;i<todo_count;i++) if(!todos[i].done){all_done=false;break;}
                 if(all_done&&todo_count>0){celebrate=10;set_smsg("ALL DONE!! purrfect!! =^..^=");}
                 else set_smsg(t->done?"done! good job :3":"back to pending~");
             }
