@@ -170,19 +170,23 @@ static void build_paths(void) {
     //Should that buffer become too short, increase this value
     #define LOCAL_BUFFER_SIZE 64
 
-    const char *home=getenv("HOME"); if(!home) home=".";
+    const char *home=getenv("HOME");
     /* $XDG_DATA_HOME/meowdo  (defaults to ~/.local/share/meowdo) */
     const char *xdg=getenv("XDG_DATA_HOME");
 
-    size_t base_length = strlen(home);
+    size_t base_length = 2;
+    if(home)
+        base_length = strlen(home);
     if(xdg && strlen(xdg)>base_length)
         base_length = strlen(xdg);
     char base[base_length + 1 + LOCAL_BUFFER_SIZE];
 
-    if (xdg && xdg[0])
+    if(xdg && xdg[0])
         snprintf(base,sizeof base,"%s/meowdo",xdg);
-    else
+    else if(home && home[0])
         snprintf(base,sizeof base,"%s/.local/share/meowdo",home);
+    else
+        strcpy(base, ".");
 
     if (mkdir(base,0755)!=0 && errno!=EEXIST){
         todo_path_length = LOCAL_BUFFER_SIZE;

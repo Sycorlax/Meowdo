@@ -12,5 +12,8 @@ CFLAGS += $(shell pkg-config --cflags ncursesw 2>/dev/null || \
 meowdo: meowdo.c
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
+debug: CFLAGS += -g
+debug: meowdo
+
 clean:
 	rm -f meowdo
