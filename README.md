@@ -44,6 +44,15 @@ cd Meowdo
 make
 ```
 
+This will compile the program using the provided `Makefile`.  
+**Do not run as root** – the program writes to `~/.local/share/meowdo/`.
+
+#### Nix/NixOS
+
+There are two methods to build Meowdo using Nix: the flake and the package.
+
+Note that the package (`default.nix`) will always do the latest tagged release, which as of writing is `1.0.0`. The flake is for the latest development commit (or "unstable") version.
+
 If using the Nix flake, you will first need to [install Nix](https://nixos.org/download/) and enable Nix flakes.
 
 If not on NixOS, add this to `~/.config/nix/nix.conf`:
@@ -65,8 +74,17 @@ nix.settings.experimental-features = [
 
 And rebuild, then run `nix build .` in the project folder.
 
-This will compile the program using the provided `Makefile`.  
-**Do not run as root** – the program writes to `~/.local/share/meowdo/`.
+Of using the package (`default.nix`), do this command:
+
+```nix
+nix-build -E 'with import <nixpkgs> { }; callPackage ./default.nix {}'
+```
+
+This will then build the package.
+
+Both methods create `./result/bin/meowdo`, which can be run.
+
+Note that getting this into the [nixpkgs](https://github.com/NixOS/nixpkgs/) repo is in the works by [Dusk](https://github.com/XDuskAshes/), aka the person writing this nix section.
 
 ## Usage
 

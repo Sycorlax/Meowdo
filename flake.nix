@@ -18,7 +18,7 @@
     in {
         packages.${system}.default = pkgs.stdenv.mkDerivation {
             pname = "meowdo";
-            version = "1.2";
+            version = "dev-4"; # Development, revision (version line change) 4 of the flake
             src = self;
 
             nativeBuildInputs = [ pkgs.gcc pkgs.gnumake ];
