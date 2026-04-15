@@ -149,7 +149,7 @@ static bool detect_utf8(void) {
         const char *v = getenv(vars[i]);
         if (!v || !*v) continue;
         /* case-insensitive search for "utf" */
-        char buf[64]; int j;
+        char buf[strlen(v) + 1]; int j;
         for (j=0; v[j] && j<63; j++) buf[j]=(char)tolower((unsigned char)v[j]);
         buf[j]='\0';
         if (strstr(buf,"utf")) return true;
@@ -163,21 +163,37 @@ static void set_smsg(const char *m) {
 }
 
 /* ------ paths ------ */
-static char todo_path[600];
+static char* todo_path;
+size_t todo_path_length;
 static void build_paths(void) {
-    const char *h=getenv("HOME"); if(!h) h=".";
+    //We use a 64-char buffer for the fixed strings added here
+    //Should that buffer become too short, increase this value
+    #define LOCAL_BUFFER_SIZE 64
 
+    const char *home=getenv("HOME"); if(!home) home=".";
     /* $XDG_DATA_HOME/meowdo  (defaults to ~/.local/share/meowdo) */
-    char base[512];
     const char *xdg=getenv("XDG_DATA_HOME");
+
+    size_t base_length = strlen(home);
+    if(xdg && strlen(xdg)>base_length)
+        base_length = strlen(xdg);
+    char base[base_length + 1 + LOCAL_BUFFER_SIZE];
+
     if (xdg && xdg[0])
         snprintf(base,sizeof base,"%s/meowdo",xdg);
     else
-        snprintf(base,sizeof base,"%s/.local/share/meowdo",h);
+        snprintf(base,sizeof base,"%s/.local/share/meowdo",home);
 
-    if (mkdir(base,0755)!=0 && errno!=EEXIST)
-        { snprintf(todo_path,sizeof todo_path,"todos.txt"); return; }
-    snprintf(todo_path,sizeof todo_path,"%s/todos.txt",base);
+    if (mkdir(base,0755)!=0 && errno!=EEXIST){
+        todo_path_length = LOCAL_BUFFER_SIZE;
+        todo_path = malloc(todo_path_length);
+        strcpy(todo_path, "todos.txt");
+        return;
+    }
+
+    todo_path_length = strlen(base) + 1 + LOCAL_BUFFER_SIZE;
+    todo_path = malloc(todo_path_length);
+    snprintf(todo_path,todo_path_length,"%s/todos.txt",base);
 }
 
 /* ------ tag cache ------ */
@@ -222,7 +238,7 @@ static void todos_load(void) {
         if (len>0&&line[len-1]=='\n') line[--len]='\0';
         if (len<5) continue;
         Todo *t=&todos[todo_count];
-        t->pinned=false;t->done=false;t->created_at=0;t->done_at=0;
+        t->done_at=0;
         t->tag[0]='\0';t->text[0]='\0';
         t->pinned=(line[0]=='P');
         t->done  =(line[2]=='x');
@@ -596,6 +612,12 @@ static void draw_right(WINDOW *w,int h,int rw){
     wnoutrefresh(w);
 }
 
+int get_left_window_width(int cols){
+    #define LEFT_WINDOW_MIN_WIDTH 20
+    int lw=cols*58/100; if(lw<LEFT_WINDOW_MIN_WIDTH)lw=LEFT_WINDOW_MIN_WIDTH;
+    return lw;
+}
+
 /* ------ main ------ */
 int main(void){
     setlocale(LC_ALL,"");
@@ -633,7 +655,7 @@ int main(void){
     erase(); refresh();
 
     int rows,cols; getmaxyx(stdscr,rows,cols);
-    int lw=cols*58/100; if(lw<20)lw=20;
+    int lw=get_left_window_width(cols);
     int rw=cols-lw, ch=rows-2;
 
     WINDOW *top =newwin(1,  cols, 0,      0);
@@ -649,7 +671,7 @@ int main(void){
         int nr,nc; getmaxyx(stdscr,nr,nc);
         if(nr!=rows||nc!=cols){
             rows=nr; cols=nc;
-            lw=cols*58/100; if(lw<20)lw=20;
+            lw=get_left_window_width(cols);
             rw=cols-lw; ch=rows-2;
             delwin(top);delwin(left);delwin(rite);delwin(sbar);
             top =newwin(1,  cols, 0,      0);
@@ -822,6 +844,8 @@ int main(void){
         default: break;
         }
     }
+
+    free(todo_path);
 
     delwin(top);delwin(left);delwin(rite);delwin(sbar);
     endwin();
