@@ -217,7 +217,7 @@ Pull requests are welcome! Please ensure:
 
 ## Acknowledgements
 
-- [Just_fauna](https://aur.archlinux.org/packages/meowdo) – AUR packaging and maintenance
+- [Bertieio]((https://github.com/Bertieio)) – AUR packaging and maintenance
 - [Dusk](https://github.com/XDuskAshes/) – Nix flake & package support, working on nixpkgs submission
  
 ## License
