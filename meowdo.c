@@ -1,8 +1,7 @@
 /*
  * meowdo  ---  a cute bongo cat todo list ---
  *
- * compile:  gcc -O2 -o meowdo meowdo.c -lncurses        (Arch / most distros)
- *           gcc -O2 -o meowdo meowdo.c -lncursesw       (Debian / Ubuntu)
+ * compile:  gcc -O2 -o meowdo meowdo.c -lncursesw       (all distros, wide-char)
  * arch:     sudo pacman -S ncurses
  * debian:   sudo apt install libncursesw5-dev
  *
@@ -41,6 +40,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <wchar.h>
 
 /* ------ constants ------ */
 #define MAX_TODOS  1024
@@ -162,6 +162,14 @@ static bool detect_utf8(void) {
     return false;
 }
 
+/* ── display_width: return the terminal column width of a UTF-8 string ── */
+static int display_width(const char *s) {
+    wchar_t wbuf[MAX_LINE];
+    size_t n = mbstowcs(wbuf, s, MAX_LINE);
+    if (n == (size_t)-1) return (int)strlen(s); /* fallback on conversion error */
+    int w = (int)wcswidth(wbuf, n);
+    return (w < 0) ? (int)strlen(s) : w;        /* wcswidth returns -1 for non-printable */
+}
 
 static void set_smsg(const char *m) {
     strncpy(smsg,m,sizeof smsg-1); smsg[sizeof smsg-1]='\0'; smsg_ttl=5;
@@ -349,18 +357,28 @@ static int popup(const char *title,const char *hint,char *out,int maxlen){
     wattron(p,COLOR_PAIR(C_PEND)|A_BOLD);
     mvwprintw(p,4,3,"> %-*.*s",field_w,field_w,out);
     wattroff(p,COLOR_PAIR(C_PEND)|A_BOLD);
-    wmove(p,4,5+len); wrefresh(p);
+    /* FIX: use display_width() instead of len for cursor placement */
+    wmove(p,4,5+display_width(out)); wrefresh(p);
 
     while(1){
         int ch=wgetch(p);
         if(ch==27||ch==KEY_F(1)){out[0]='\0';cancelled=1;break;}
         if(ch=='\n'||ch=='\r') break;
-        if((ch==KEY_BACKSPACE||ch==127||ch=='\b')&&len>0){out[--len]='\0';}
-        else if(ch>=32&&ch<256&&len<maxlen-1){out[len++]=(char)ch;out[len]='\0';}
+        if((ch==KEY_BACKSPACE||ch==127||ch=='\b')&&len>0){
+            /* FIX: walk back past UTF-8 continuation bytes (10xxxxxx)
+               so we always remove a whole character, not half of one */
+            do { len--; } while (len > 0 && ((unsigned char)out[len] & 0xC0) == 0x80);
+            out[len]='\0';
+        }
+        /* FIX: accept bytes >= 0x80 so UTF-8 continuation bytes pass through */
+        else if(((ch>=32&&ch<256)||(ch&0x80))&&len<maxlen-1){
+            out[len++]=(char)ch; out[len]='\0';
+        }
         wattron(p,COLOR_PAIR(C_PEND)|A_BOLD);
         mvwprintw(p,4,3,"> %-*.*s",field_w,field_w,out);
         wattroff(p,COLOR_PAIR(C_PEND)|A_BOLD);
-        wmove(p,4,5+len); wrefresh(p);
+        /* FIX: use display_width() for accurate cursor column after each keystroke */
+        wmove(p,4,5+display_width(out)); wrefresh(p);
     }
     curs_set(0); delwin(p); touchwin(stdscr); refresh();
     return(!cancelled&&len>0);
