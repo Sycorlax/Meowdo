@@ -162,14 +162,6 @@ static bool detect_utf8(void) {
     return false;
 }
 
-/* ── display_width: return the terminal column width of a UTF-8 string ── */
-static int display_width(const char *s) {
-    wchar_t wbuf[MAX_LINE];
-    size_t n = mbstowcs(wbuf, s, MAX_LINE);
-    if (n == (size_t)-1) return (int)strlen(s); /* fallback on conversion error */
-    int w = (int)wcswidth(wbuf, n);
-    return (w < 0) ? (int)strlen(s) : w;        /* wcswidth returns -1 for non-printable */
-}
 
 static void set_smsg(const char *m) {
     strncpy(smsg,m,sizeof smsg-1); smsg[sizeof smsg-1]='\0'; smsg_ttl=5;
@@ -336,52 +328,197 @@ static Layout get_layout(int rows, int cols) {
     return LAYOUT_FULL;
 }
 
-/* ------ popup ------ */
-static int popup(const char *title,const char *hint,char *out,int maxlen){
-    int rows,cols; getmaxyx(stdscr,rows,cols);
-    int pw=(cols<74)?cols-4:74, ph=7;
-    if(pw<20||rows<ph+2) return 0;   /* terminal too small for popup */
-    int py=rows/2-ph/2, px=(cols-pw)/2;
-    WINDOW *p=newwin(ph,pw,py,px); if(!p) return 0;
+/* ------ popup helpers ------ */
 
-    wattron(p,COLOR_PAIR(C_BORDER)|A_BOLD); box(p,0,0); wattroff(p,COLOR_PAIR(C_BORDER)|A_BOLD);
-    wattron(p,COLOR_PAIR(C_TOPBAR)|A_BOLD); mvwprintw(p,0,2," %s ",title); wattroff(p,COLOR_PAIR(C_TOPBAR)|A_BOLD);
-    if(hint&&hint[0]){wattron(p,A_DIM); mvwprintw(p,2,3,"%.*s",pw-6,hint); wattroff(p,A_DIM);}
-    wattron(p,COLOR_PAIR(C_PEND)|A_BOLD); mvwprintw(p,4,3,"> "); wattroff(p,COLOR_PAIR(C_PEND)|A_BOLD);
-    wattron(p,A_DIM); mvwprintw(p,ph-1,3," Enter:confirm   Esc:cancel "); wattroff(p,A_DIM);
+/*
+ * popup_draw_field: render the input field across one or more lines,
+ * correctly handling multi-byte UTF-8 (e.g. Cyrillic) by measuring
+ * display columns rather than byte lengths.
+ *
+ * Returns the (row, col) position where the cursor should be placed.
+ *
+ * Layout inside the window (pw wide):
+ *   col 3: "> "   (2 chars prefix)
+ *   col 5..pw-3:  text, wrapped to field_w = pw-7 display columns per line
+ *
+ * We walk the UTF-8 string character-by-character using mbtowc(),
+ * tracking display columns consumed on the current line.  When a
+ * character would overflow the line we move to the next row.
+ */
+static void popup_draw_field(WINDOW *win, int start_row, int field_w,
+                             const char *s,
+                             int *cur_row_out, int *cur_col_out)
+{
+    /* clear all field rows first — up to 8 extra lines is plenty */
+    for (int r = start_row; r < start_row + 8; r++)
+        mvwprintw(win, r, 3, "%-*s", field_w + 2, "");
+
+    wattron(win, COLOR_PAIR(C_PEND)|A_BOLD);
+    mvwprintw(win, start_row, 3, "> ");
+    wattroff(win, COLOR_PAIR(C_PEND)|A_BOLD);
+
+    int row = start_row;
+    int col = 5;          /* column after "> " */
+    int col_used = 0;     /* display columns used on this line */
+    const char *p = s;
+
+    while (*p) {
+        wchar_t wc;
+        int mb = mbtowc(&wc, p, MB_CUR_MAX);
+        if (mb <= 0) { p++; continue; }   /* skip invalid bytes */
+
+        int wcw = wcwidth(wc);
+        if (wcw < 0) wcw = 0;             /* non-printable → 0 width */
+
+        /* wrap to next line if this char doesn't fit */
+        if (col_used + wcw > field_w) {
+            /* pad remainder of current line */
+            wattron(win, COLOR_PAIR(C_PEND)|A_BOLD);
+            mvwprintw(win, row, col, "%-*s", field_w - col_used, "");
+            wattroff(win, COLOR_PAIR(C_PEND)|A_BOLD);
+            row++;
+            col = 5; col_used = 0;
+            /* continuation lines: no "> " prefix, just indent */
+            wattron(win, COLOR_PAIR(C_PEND)|A_BOLD);
+            mvwprintw(win, row, 3, "  ");
+            wattroff(win, COLOR_PAIR(C_PEND)|A_BOLD);
+        }
+
+        /* print the character */
+        char mb_buf[MB_CUR_MAX + 1];
+        memcpy(mb_buf, p, (size_t)mb);
+        mb_buf[mb] = '\0';
+        wattron(win, COLOR_PAIR(C_PEND)|A_BOLD);
+        mvwprintw(win, row, col, "%s", mb_buf);
+        wattroff(win, COLOR_PAIR(C_PEND)|A_BOLD);
+
+        col      += wcw;
+        col_used += wcw;
+        p        += mb;
+    }
+
+    *cur_row_out = row;
+    *cur_col_out = col;
+}
+
+/*
+ * popup_needed_rows: how many input-field rows does the current text
+ * need given field_w display columns per row?
+ */
+static int popup_needed_rows(const char *s, int field_w) {
+    if (!s || !s[0] || field_w < 1) return 1;
+    int rows = 1, col_used = 0;
+    const char *p = s;
+    while (*p) {
+        wchar_t wc;
+        int mb = mbtowc(&wc, p, MB_CUR_MAX);
+        if (mb <= 0) { p++; continue; }
+        int wcw = wcwidth(wc); if (wcw < 0) wcw = 0;
+        if (col_used + wcw > field_w) { rows++; col_used = 0; }
+        col_used += wcw;
+        p += mb;
+    }
+    return rows;
+}
+
+/* ------ popup ------ */
+/*
+ * Window row layout (ph rows total):
+ *   row 0        top border          (drawn by box())
+ *   row 1        title bar           (drawn by box() + title)
+ *   row 2        hint text           (A_DIM)
+ *   row 3        blank               (inside box)
+ *   row 4..4+FR-1  input field lines  (FR = field_rows)
+ *   row 4+FR     blank separator      (inside box)
+ *   row 4+FR+1   "Enter:confirm…"    (A_DIM, second-to-last inside row)
+ *   row ph-1     bottom border       (drawn by box())
+ *
+ *   ph = 4 + FR + 2 + 1(bottom border) = FR + 7
+ *
+ * popup_draw_field is told the first field row (4) AND the last
+ * allowed field row (4+FR-1) so it never writes into the separator
+ * or the hint bar.
+ */
+static int popup(const char *title, const char *hint, char *out, int maxlen){
+    int rows, cols; getmaxyx(stdscr, rows, cols);
+    int pw = (cols < 74) ? cols - 4 : 74;
+    if (pw < 20 || rows < 9) return 0;
+
+    int field_w = pw - 7;   /* usable display columns per input line */
+
+    /* ph_for: given field_rows, compute total window height */
+    #define PH_FOR(fr) ((fr) + 7)
+    /* clamp ph so it fits the terminal and has a sane minimum */
+    #define CLAMP_PH(ph) do { \
+        if ((ph) > rows - 2) (ph) = rows - 2; \
+        if ((ph) < PH_FOR(1)) (ph) = PH_FOR(1); \
+    } while(0)
+
+    int field_rows = popup_needed_rows(out, field_w);
+    if (field_rows < 1) field_rows = 1;
+    int ph = PH_FOR(field_rows);
+    CLAMP_PH(ph);
+
+    int px = (cols - pw) / 2;
+    int py = rows/2 - ph/2;
+    WINDOW *p = newwin(ph, pw, py, px); if (!p) return 0;
+
+    /* full redraw: chrome + field, bottom bar always at ph-2 (inside border) */
+    #define POPUP_REDRAW() do { \
+        werase(p); \
+        wattron(p,COLOR_PAIR(C_BORDER)|A_BOLD); box(p,0,0); wattroff(p,COLOR_PAIR(C_BORDER)|A_BOLD); \
+        wattron(p,COLOR_PAIR(C_TOPBAR)|A_BOLD); mvwprintw(p,0,2," %s ",title); wattroff(p,COLOR_PAIR(C_TOPBAR)|A_BOLD); \
+        if(hint&&hint[0]){wattron(p,A_DIM); mvwprintw(p,2,3,"%.*s",pw-6,hint); wattroff(p,A_DIM);} \
+        wattron(p,A_DIM); mvwprintw(p,ph-2,3," Enter:confirm   Esc:cancel "); wattroff(p,A_DIM); \
+        popup_draw_field(p, 4, field_w, out, &cur_row, &cur_col); \
+    } while(0)
 
     curs_set(1);
-    int len=(int)strnlen(out,(size_t)(maxlen-1));
-    int cancelled=0, field_w=pw-7;
+    int len = (int)strnlen(out, (size_t)(maxlen-1));
+    int cancelled = 0;
+    int cur_row = 4, cur_col = 5;
 
-    wattron(p,COLOR_PAIR(C_PEND)|A_BOLD);
-    mvwprintw(p,4,3,"> %-*.*s",field_w,field_w,out);
-    wattroff(p,COLOR_PAIR(C_PEND)|A_BOLD);
-    /* FIX: use display_width() instead of len for cursor placement */
-    wmove(p,4,5+display_width(out)); wrefresh(p);
+    POPUP_REDRAW();
+    wmove(p, cur_row, cur_col); wrefresh(p);
 
-    while(1){
-        int ch=wgetch(p);
-        if(ch==27||ch==KEY_F(1)){out[0]='\0';cancelled=1;break;}
-        if(ch=='\n'||ch=='\r') break;
-        if((ch==KEY_BACKSPACE||ch==127||ch=='\b')&&len>0){
-            /* FIX: walk back past UTF-8 continuation bytes (10xxxxxx)
-               so we always remove a whole character, not half of one */
+    while (1) {
+        int ch = wgetch(p);
+        if (ch == 27 || ch == KEY_F(1)) { out[0]='\0'; cancelled=1; break; }
+        if (ch == '\n' || ch == '\r') break;
+
+        if ((ch == KEY_BACKSPACE || ch == 127 || ch == '\b') && len > 0) {
+            /* walk back past UTF-8 continuation bytes (10xxxxxx) */
             do { len--; } while (len > 0 && ((unsigned char)out[len] & 0xC0) == 0x80);
-            out[len]='\0';
+            out[len] = '\0';
         }
-        /* FIX: accept bytes >= 0x80 so UTF-8 continuation bytes pass through */
-        else if(((ch>=32&&ch<256)||(ch&0x80))&&len<maxlen-1){
-            out[len++]=(char)ch; out[len]='\0';
+        /* accept bytes ≥ 0x80 so UTF-8 continuation bytes pass through */
+        else if (((ch >= 32 && ch < 256) || (ch & 0x80)) && len < maxlen-1) {
+            out[len++] = (char)ch; out[len] = '\0';
         }
-        wattron(p,COLOR_PAIR(C_PEND)|A_BOLD);
-        mvwprintw(p,4,3,"> %-*.*s",field_w,field_w,out);
-        wattroff(p,COLOR_PAIR(C_PEND)|A_BOLD);
-        /* FIX: use display_width() for accurate cursor column after each keystroke */
-        wmove(p,4,5+display_width(out)); wrefresh(p);
+
+        /* resize popup if text now wraps to a different number of lines */
+        int new_fr = popup_needed_rows(out, field_w);
+        if (new_fr < 1) new_fr = 1;
+        int new_ph = PH_FOR(new_fr);
+        CLAMP_PH(new_ph);
+
+        if (new_ph != ph) {
+            ph = new_ph;
+            delwin(p);
+            py = rows/2 - ph/2;
+            p = newwin(ph, pw, py, px);
+            if (!p) break;
+        }
+
+        POPUP_REDRAW();
+        wmove(p, cur_row, cur_col); wrefresh(p);
     }
+
+    #undef POPUP_REDRAW
+    #undef PH_FOR
+    #undef CLAMP_PH
     curs_set(0); delwin(p); touchwin(stdscr); refresh();
-    return(!cancelled&&len>0);
+    return (!cancelled && len > 0);
 }
 
 /* ------ draw: too small overlay ------ */
