@@ -328,25 +328,7 @@ static Layout get_layout(int rows, int cols) {
     return LAYOUT_FULL;
 }
 
-/* ------ popup helpers ------ */
 
-/*
- * popup_draw_field: render the input field across one or more lines,
- * correctly handling multi-byte UTF-8 (e.g. Cyrillic) by measuring
- * display columns rather than byte lengths.
- *
- * Returns the (row, col) position where the cursor should be placed.
- *
- * Layout inside the window (pw wide):
- *   col 3: "> "   (2 chars prefix)
- *   col 5..pw-3:  text, wrapped to field_w = pw-7 display columns per line
- *
- * We walk the UTF-8 string character-by-character using mbtowc(),
- * tracking display columns consumed on the current line.  When a
- * character would overflow the line we move to the next row.
- */
-/* max_row: last row the field may use. For a window of height ph:
- *   ph-1 = bottom border (box), ph-2 = hint bar -> max_row = ph-3 */
 static void popup_draw_field(WINDOW *win, int start_row, int max_row, int field_w,
                              const char *s,
                              int *cur_row_out, int *cur_col_out)
@@ -404,10 +386,6 @@ static void popup_draw_field(WINDOW *win, int start_row, int max_row, int field_
     *cur_col_out = col;
 }
 
-/*
- * popup_needed_rows: how many input-field rows does the current text
- * need given field_w display columns per row?
- */
 static int popup_needed_rows(const char *s, int field_w) {
     if (!s || !s[0] || field_w < 1) return 1;
     int rows = 1, col_used = 0;
@@ -424,34 +402,16 @@ static int popup_needed_rows(const char *s, int field_w) {
     return rows;
 }
 
-/* ------ popup ------ */
-/*
- * Window row layout (ph rows total):
- *   row 0        top border          (drawn by box())
- *   row 1        title bar           (drawn by box() + title)
- *   row 2        hint text           (A_DIM)
- *   row 3        blank               (inside box)
- *   row 4..4+FR-1  input field lines  (FR = field_rows)
- *   row 4+FR     blank separator      (inside box)
- *   row 4+FR+1   "Enter:confirm…"    (A_DIM, second-to-last inside row)
- *   row ph-1     bottom border       (drawn by box())
- *
- *   ph = 4 + FR + 2 + 1(bottom border) = FR + 7
- *
- * popup_draw_field is told the first field row (4) AND the last
- * allowed field row (4+FR-1) so it never writes into the separator
- * or the hint bar.
- */
+
 static int popup(const char *title, const char *hint, char *out, int maxlen){
     int rows, cols; getmaxyx(stdscr, rows, cols);
     int pw = (cols < 74) ? cols - 4 : 74;
     if (pw < 20 || rows < 9) return 0;
 
-    int field_w = pw - 7;   /* usable display columns per input line */
-
-    /* ph_for: given field_rows, compute total window height */
+    int field_w = pw - 7;   
+    
     #define PH_FOR(fr) ((fr) + 7)
-    /* clamp ph so it fits the terminal and has a sane minimum */
+
     #define CLAMP_PH(ph) do { \
         if ((ph) > rows - 2) (ph) = rows - 2; \
         if ((ph) < PH_FOR(1)) (ph) = PH_FOR(1); \
