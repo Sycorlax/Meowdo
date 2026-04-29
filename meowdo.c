@@ -1,6 +1,6 @@
 /*
  * meowdo  ---  a cute bongo cat todo list ---
- *										1.3	VERSION	
+ *
  * compile:  gcc -O2 -o meowdo meowdo.c -lncursesw       (all distros, wide-char)
  * arch:     sudo pacman -S ncurses
  * debian:   sudo apt install libncursesw5-dev
@@ -466,10 +466,9 @@ static int popup(const char *title, const char *hint, char *out, int maxlen){
         if (ch == 27 || ch == KEY_F(1)) { out[0]='\0'; cancelled=1; break; }
         if (ch == '\n' || ch == '\r') break;
         
-        /* silently ignore navigation keys (don't pass to main loop) */
+        /* ignore ONLY actual key codes (not ASCII chars) to prevent leaking to main loop */
         if (ch == KEY_UP || ch == KEY_DOWN || ch == KEY_LEFT || ch == KEY_RIGHT ||
-            ch == KEY_HOME || ch == KEY_END || ch == KEY_PPAGE || ch == KEY_NPAGE ||
-            ch == 'k' || ch == 'j' || ch == 'g' || ch == 'G' || ch == 'd' || ch == 'D') {
+            ch == KEY_HOME || ch == KEY_END || ch == KEY_PPAGE || ch == KEY_NPAGE) {
             /* just redraw and keep waiting for valid input */
             POPUP_REDRAW();
             wmove(p, cur_row, cur_col); wrefresh(p);
@@ -481,9 +480,11 @@ static int popup(const char *title, const char *hint, char *out, int maxlen){
             do { len--; } while (len > 0 && ((unsigned char)out[len] & 0xC0) == 0x80);
             out[len] = '\0';
         }
-        /* accept bytes ≥ 0x80 so UTF-8 continuation bytes pass through */
-        else if (((ch >= 32 && ch < 256) || (ch & 0x80)) && len < maxlen-1) {
-            out[len++] = (char)ch; out[len] = '\0';
+        /* accept printable ASCII and all UTF-8 continuation bytes (0x80+) */
+        else if ((ch >= 32 && ch <= 126) || (ch & 0x80)) {
+            if (len < maxlen-1) {
+                out[len++] = (char)ch; out[len] = '\0';
+            }
         }
 
         /* resize popup if text now wraps to a different number of lines */
@@ -520,7 +521,7 @@ static void draw_toosmall(int rows, int cols) {
     static const char *lines[] = {
         "=^..^=",
         "terminal too small~",
-        "please resize and bring me some coffe nya!",
+        "please resize nya!",
     };
     int n = 3;
     int sy = rows/2 - n/2; if(sy<0) sy=0;
