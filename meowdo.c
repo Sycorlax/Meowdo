@@ -877,8 +877,64 @@ static bool alloc_windows(Windows *w, int rows, int cols, int lw, int rw, int ch
     }
 }
 
+static void print_version(void) {
+    printf("meowdo version 1.3.5\n");  
+    printf("thanks for using meowdo :3\n");
+    printf(" =^..^=  =^..^=  =^..^=\n");
+}
+
+
+static void print_help(void) {
+    printf("meowdo  ---  a cute bongo cat todo list  =^..^=\n\n");
+    printf("Usage: meowdo [OPTIONS]\n\n");
+    printf("Options:\n");
+    printf("  --version    Show version information\n");
+    printf("  --help       Show this help message\n\n");
+    printf("Keys:\n");
+    printf("  j/k          Navigate up/down\n");
+    printf("  g/G          Jump to top/bottom\n");
+    printf("  n            New task\n");
+    printf("  e            Edit selected task\n");
+    printf("  Space        Toggle done/not done\n");
+    printf("  p            Toggle pin\n");
+    printf("  t            Set/clear tag\n");
+    printf("  d            Delete selected task\n");
+    printf("  D            Delete ALL tasks\n");
+    printf("  /            Search\n");
+    printf("  Esc          Clear search + filter\n");
+    printf("  1-6          Filter by tag\n");
+    printf("  0            Show all\n");
+    printf("  q            Quit\n");
+}
+
+static bool parse_args(int argc, char *argv[]) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0 || 
+            strcmp(argv[i], "-v") == 0) {
+            print_version();
+            return true;
+        }
+        else if (strcmp(argv[i], "--help") == 0 || 
+                 strcmp(argv[i], "-h") == 0) {
+            print_help();
+            return true;
+        }
+        else {
+            printf("Unknown option: %s\n", argv[i]);
+            printf("Try 'meowdo --help' for more information.\n");
+            return true;
+        }
+    }
+    return false;
+}
+
 /* ------ main ------ */
-int main(void){
+int main(int argc, char *argv[]){
+    
+    if (parse_args(argc, argv)) {
+        return 0; /* Exit after displaying info */
+    }
+
     setlocale(LC_ALL,"");
     g_utf8 = detect_utf8();
     BONGO   = g_utf8 ? BONGO_UTF8 : BONGO_ASCII;

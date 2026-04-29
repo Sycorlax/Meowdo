@@ -2,7 +2,7 @@
 
 stdenv.mkDerivation rec {
     pname = "meowdo";
-    version = "1.3.0";
+    version = "1.3.5";
 
     src = fetchFromGitHub {
         owner = "Sycorlax";

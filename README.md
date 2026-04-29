@@ -70,7 +70,7 @@ This will compile the program using the provided `Makefile`.
 
 There are two methods to build Meowdo using Nix: the flake and the package.
 
-Note that the package (`default.nix`) will always do the latest tagged release, which as of writing is `1.3.0`. The flake is for the latest development commit (or "unstable") version.
+Note that the package (`default.nix`) will always do the latest tagged release, which as of writing is `1.3.5`. The flake is for the latest development commit (or "unstable") version.
 
 If using the Nix flake, you will first need to [install Nix](https://nixos.org/download/) and enable Nix flakes.
 
