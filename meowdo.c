@@ -521,8 +521,8 @@ static void draw_toosmall(int rows, int cols) {
     static const char *lines[] = {
         "=^..^=",
         "terminal too small~",
-        "please resize nya!",
-    };
+        "please resize and bring me some coffe nya!",
+};
     int n = 3;
     int sy = rows/2 - n/2; if(sy<0) sy=0;
     for(int i=0;i<n&&sy+i<rows;i++){
