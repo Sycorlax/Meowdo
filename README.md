@@ -218,7 +218,7 @@ Pull requests are welcome! Please ensure:
 ## Acknowledgements
 
 - [Bertieio](https://github.com/Bertieio/) – AUR packaging and maintenance
-- [Dusk](https://github.com/XDuskAshes/) – Nix flake & package support, working on nixpkgs submission
+- [Dusk](https://github.com/XDuskAshes/) – Nix flake & package support, working on nixpkgs submission (currently stalled, as contributing to nixpkgs is difficult okay 3: -Dusk)
  
 ## License
 
