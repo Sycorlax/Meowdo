@@ -15,10 +15,14 @@
     let
         system = "x86_64-linux";
         pkgs = nixpkgs.legacyPackages.${system};
+        revision = "5"; # Change this for every time you add a new
+                        # dependency. Refer to https://search.nixos.org/packages
+                        # to find packages matching your possible future
+                        # dependencies.
     in {
         packages.${system}.default = pkgs.stdenv.mkDerivation {
             pname = "meowdo";
-            version = "dev-4"; # Development, revision (version line change) 4 of the flake
+            version = "dev-${revision}";
             src = self;
 
             nativeBuildInputs = [ pkgs.gcc pkgs.gnumake ];
