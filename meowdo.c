@@ -42,15 +42,6 @@
 #include <stdbool.h>
 #include <wchar.h>
 
-static void flush_input(void) {
-    int ch;
-    timeout(0);
-    while ((ch = getch()) != ERR) {
-        (void)ch;
-    }
-    timeout(-1);
-}
-
 /* ------ constants ------ */
 #define MAX_TODOS  1024
 #define MAX_LINE    256
@@ -1064,7 +1055,7 @@ int main(int argc, char *argv[]){
                 set_smsg("task added! nya~");
             }
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
@@ -1078,7 +1069,7 @@ int main(int argc, char *argv[]){
                 todos_save(); rebuild_vis(); set_smsg("task updated! nya~");
             }
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
@@ -1123,7 +1114,7 @@ int main(int argc, char *argv[]){
             } else {snprintf(t->tag, MAX_TAG, "none");set_smsg("tag cleared");}
             todos_save(); rebuild_vis(); mark_dirty();
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
@@ -1142,7 +1133,7 @@ int main(int argc, char *argv[]){
                 set_smsg("deleted! poof~");
             }
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
@@ -1157,7 +1148,7 @@ int main(int argc, char *argv[]){
                 set_smsg("clean slate! fresh start nya~");
             }
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
@@ -1168,7 +1159,7 @@ int main(int argc, char *argv[]){
             else search[0]='\0';
             sel=0; list_top=0; rebuild_vis();
             /* flush any queued input from popup interaction */
-            flush_input();
+            timeout(0); while(getch()!=ERR); timeout(-1);
             break;
         }
 
