@@ -1,14 +1,19 @@
-CC = cc
+CC     = gcc
 CFLAGS = -O2 -Wall -Wextra
-LIBS = -lncurses
 
-all: meowdo
+# Try ncursesw first (Debian/Ubuntu), fall back to ncurses (Arch/macOS)
+LIBS = $(shell pkg-config --libs ncursesw 2>/dev/null || \
+        pkg-config --libs ncurses  2>/dev/null || \
+        echo -lncurses)
+
+CFLAGS += $(shell pkg-config --cflags ncursesw 2>/dev/null || \
+           pkg-config --cflags ncurses  2>/dev/null || true)
 
 meowdo: meowdo.c
-	$(CC) $(CFLAGS) -o meowdo meowdo.c $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
-debug:
-	$(MAKE) CFLAGS="$(CFLAGS) -g" all
+debug: CFLAGS += -g
+debug: meowdo
 
 clean:
 	rm -f meowdo
