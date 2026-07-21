@@ -30,6 +30,7 @@
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 700
 #endif
+
 #include <ncurses.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -41,6 +42,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <wchar.h>
+#include <errno.h>
+#include <limits.h>
 
 static void flush_input(void) {
     int ch;
@@ -177,38 +180,68 @@ static void set_smsg(const char *m) {
 }
 
 /* ------ paths ------ */
-static char* todo_path;
+static char *todo_path;
 size_t todo_path_length;
-static void build_paths(void) {
-    #define LOCAL_BUFFER_SIZE 64
 
-    const char *home=getenv("HOME");
-    const char *xdg=getenv("XDG_DATA_HOME");
+static int mkdir_p(const char *path) {
+    char tmp[PATH_MAX];
+    size_t len;
 
-    size_t base_length = 2;
-    if(home)
-        base_length = strlen(home);
-    if(xdg && strlen(xdg)>base_length)
-        base_length = strlen(xdg);
-    char base[base_length + 1 + LOCAL_BUFFER_SIZE];
+    if (!path || !*path) return -1;
 
-    if(xdg && xdg[0])
-        snprintf(base,sizeof base,"%s/meowdo",xdg);
-    else if(home && home[0])
-        snprintf(base,sizeof base,"%s/.local/share/meowdo",home);
-    else
-        strcpy(base, ".");
-
-    if (mkdir(base,0755)!=0 && errno!=EEXIST){
-        todo_path_length = LOCAL_BUFFER_SIZE;
-        todo_path = malloc(todo_path_length);
-        strcpy(todo_path, "todos.txt");
-        return;
+    len = strlen(path);
+    if (len >= sizeof tmp) {
+        errno = ENAMETOOLONG;
+        return -1;
     }
 
-    todo_path_length = strlen(base) + 1 + LOCAL_BUFFER_SIZE;
+    memcpy(tmp, path, len + 1);
+
+    for (char *p = tmp + 1; *p; ++p) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+            *p = '/';
+        }
+    }
+
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+    return 0;
+}
+
+static void build_paths(void) {
+    const char *home = getenv("HOME");
+    const char *xdg = getenv("XDG_DATA_HOME");
+    const char *userprofile = getenv("USERPROFILE");
+    char base[PATH_MAX];
+
+    todo_path = NULL;
+    todo_path_length = 0;
+    base[0] = '\0';
+
+    if (xdg && *xdg) {
+        if (snprintf(base, sizeof base, "%s/meowdo", xdg) >= (int)sizeof base) return;
+    } else if (home && *home) {
+        if (snprintf(base, sizeof base, "%s/.local/share/meowdo", home) >= (int)sizeof base) return;
+    } else if (userprofile && *userprofile) {
+        if (snprintf(base, sizeof base, "%s/meowdo", userprofile) >= (int)sizeof base) return;
+    } else {
+        if (snprintf(base, sizeof base, "./meowdo") >= (int)sizeof base) return;
+    }
+
+    if (mkdir_p(base) != 0) {
+        if (snprintf(base, sizeof base, "%s", ".") >= (int)sizeof base) return;
+    }
+
+    todo_path_length = strlen(base) + sizeof "/todos.txt";
     todo_path = malloc(todo_path_length);
-    snprintf(todo_path,todo_path_length,"%s/todos.txt",base);
+    if (!todo_path) return;
+
+    if (snprintf(todo_path, todo_path_length, "%s/todos.txt", base) >= (int)todo_path_length) {
+        free(todo_path);
+        todo_path = NULL;
+        todo_path_length = 0;
+    }
 }
 
 /* ------ tag cache ------ */
