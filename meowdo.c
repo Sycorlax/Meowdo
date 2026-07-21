@@ -27,8 +27,17 @@
  * line format: <P|->|<x| >|<tag>|<text>|<created_ts>|<done_ts>
  */
 
-#ifndef _XOPEN_SOURCE
+#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 700
+#undef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 700
+#endif
+
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
+#endif
+
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE 1
 #endif
 
 #include <ncurses.h>
